@@ -1,0 +1,3 @@
+credstash
+everett
+google-api-python-client
