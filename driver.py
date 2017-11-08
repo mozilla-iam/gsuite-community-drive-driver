@@ -1,4 +1,5 @@
 """Mozilla GSuite Driver"""
+import credstash
 import httplib2
 import logging
 import os
@@ -12,6 +13,18 @@ APPLICATION_NAME = 'Gdrive-Community-Test'
 
 logger = logging.getLogger(__name__)
 
+
+def get_secret(secret_name, context):
+    """Fetch secret from environment or credstash."""
+    secret = os.getenv(secret_name.split('.')[1], None)
+
+    if not secret:
+        secret = credstash.getSecret(
+            name=secret_name,
+            context=context,
+            region="us-west-2"
+        )
+    return secret
 
 class TeamDrive(object):
     def __init__(self, drive_name):
@@ -30,6 +43,9 @@ class TeamDrive(object):
                 requestId=self._generate_request_id(),
                 fields='id'
             ).execute()
+
+        logger.info("Ensuring the robot owns the drive.")
+        self.ensure_iam_robot_owner()
 
         logger.info('A new gdrive has been created for proposed name: {}'.format(self.drive_name))
 
@@ -53,7 +69,7 @@ class TeamDrive(object):
             logger.info('Drive already has been discovered returning self.drive: {}'.format(self.drive_name))
             return self.drive
         else:
-            result = self.gsuite_api.teamdrives().list().execute()
+            result = self.gsuite_api.teamdrives().list(pageSize=100,useDomainAdminAccess=True).execute()
 
             for drive in result.get('teamDrives'):
                 if self.drive_name == drive.get('name'):
@@ -86,7 +102,12 @@ class TeamDrive(object):
 
         drive = self.find()
         selector_fields = "permissions(kind,id,type,emailAddress,domain,role,allowFileDiscovery,displayName,photoLink,expirationTime,teamDrivePermissionDetails,deleted)"
-        resp = self.gsuite_api.permissions().list(fileId=drive.get('id'), supportsTeamDrives=True, fields=selector_fields).execute()
+
+        resp = self.gsuite_api.permissions().list(
+            fileId=drive.get('id'), supportsTeamDrives=True,
+            useDomainAdminAccess=True, fields=selector_fields
+        ).execute()
+
         permissions = resp.get('permissions')
         return permissions
 
@@ -96,18 +117,56 @@ class TeamDrive(object):
             self.authenticate()
         # For now assume we only give write.
         role = 'writer'
-        body = {'type': 'user', 'role': role, 'emailAddress': member_email}
+
+        body = {
+            'type': 'user', 'role': role,
+            'emailAddress': member_email, 'sendNotificationEmail': False
+        }
+
         drive = self.find()
 
         return self.gsuite_api.permissions().create(
             body=body, fileId=drive.get('id'),
-            supportsTeamDrives=True, fields='id'
+            supportsTeamDrives=True,
+            useDomainAdminAccess=True,
+            fields='id'
+        ).execute().get('id')
+
+    def ensure_iam_robot_owner(self):
+        """Add a member to a team drive."""
+        if self.gsuite_api is None:
+            self.authenticate()
+        # For now assume we only give write.
+
+        #return credentials
+        if os.getenv('environment') == 'prod':
+            logger.info('prod configuration active.')
+            email = 'iam-robot@test.mozilla.com'
+        elif os.getenv('environment') == 'dev':
+            logger.info('dev configuration active.')
+            email = 'iam-robot@test.mozilla.com'
+        else:
+            email = os.getenv('delegated_credentials')
+
+        role = 'organizer'
+        body = {'type': 'user', 'role': role, 'emailAddress': email}
+        drive = self.find()
+
+        return self.gsuite_api.permissions().create(
+            body=body, fileId=drive.get('id'),
+            supportsTeamDrives=True,
+            useDomainAdminAccess=True,
+            fields='id'
         ).execute().get('id')
 
     def member_remove(self, member_email):
         """Remove a member from a team drive."""
         if self.gsuite_api is None:
             self.authenticate()
+
+        # Do not strip owner.
+        if member_email == 'iam_robot@test.mozilla.com' or member_email == 'iam_robot@mozilla.com':
+            return None
 
         drive = self.find()
         permission_id = self._email_to_permission_id(member_email)
@@ -141,21 +200,25 @@ class TeamDrive(object):
             if member not in member_list:
                 removals.append(member)
 
-        return {'additions': additions, 'removals': removals, 'noops': noops}
+        proposal = {'additions': additions, 'removals': removals, 'noops': noops}
+        logger.info("Membership list built: {}".format(proposal))
+        return proposal
 
     def execute_proposal(self, reconciled_dictionary):
         """Carries out the addition, deletions, and noops."""
-        for member in reconciled_dictionary['additions']:
-            logger.info('Adding member {} to {}.'.format(member, self.drive_name))
-            self.member_add(member)
+        if reconciled_dictionary['additions'] is not []:
+            for member in reconciled_dictionary['additions']:
+                logger.info('Adding member {} to {}.'.format(member, self.drive_name))
+                self.member_add(member)
 
-        for member in reconciled_dictionary['removals']:
-            logger.info('Removing member {} from {}.'.format(member, self.drive_name))
-            self.member_remove(member)
+        if reconciled_dictionary['removals'] is not []:
+            for member in reconciled_dictionary['removals']:
+                logger.info('Removing member {} from {}.'.format(member, self.drive_name))
+                self.member_remove(member)
 
     def _email_to_permission_id(self, email):
         for member in self.members:
-            if emails == member.get('emailAddress'):
+            if email == member.get('emailAddress'):
                 return member.get('id')
 
     def _membership_to_email_list(self, members):
@@ -168,7 +231,7 @@ class TeamDrive(object):
         credentials = self._get_credentials()
         http = credentials.authorize(httplib2.Http())
         self.gsuite_api = discovery.build('drive', 'v3', http=http)
-        logger.info('Authenticated with GSuite using service account: {}'.format(self.drive_name))
+        logger.info('Authenticated with GSuite using service account: {}'.format(credentials))
 
     def _format_metadata(self, drive_name):
         return {'name': drive_name}
@@ -177,9 +240,12 @@ class TeamDrive(object):
         """
         Gets valid user credentials from stored file.
         """
-        home_dir = os.path.expanduser('~')
-        credential_dir = os.path.join(home_dir, '.credentials')
-        credential_path = os.path.join(credential_dir, SA_CREDENTIALS_FILENAME)
+        secret = get_secret('gsuite-driver.token', {'app': 'gsuite-driver'})
+        secret_file = open('/tmp/{}'.format(SA_CREDENTIALS_FILENAME),'w')
+        secret_file.write(secret)
+        secret_file.close()
+        cred_dir = os.path.expanduser('/tmp/')
+        credential_path = os.path.join(cred_dir, SA_CREDENTIALS_FILENAME)
 
         # This scope is basically drive admin.  There is no granualar scope
         # to facilitate team drive interaction.
@@ -189,8 +255,15 @@ class TeamDrive(object):
             credential_path, scopes
         )
 
-        delegated_credentials = credentials.create_delegated('me@andrewkrug.com')
-
+        #return credentials
+        if os.getenv('environment') == 'prod':
+            logger.info('prod configuration active.')
+            delegated_credentials = credentials.create_delegated('iam-robot@test.mozilla.com')
+        elif os.getenv('environment') == 'dev':
+            logger.info('dev configuration active.')
+            delegated_credentials = credentials.create_delegated('iam-robot@test.mozilla.com')
+        else:
+            delegated_credentials = credentials.create_delegated(os.getenv('delegated_credentials'))
         return delegated_credentials
 
     def _generate_request_id(self):

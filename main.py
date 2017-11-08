@@ -1,5 +1,6 @@
 import boto3
 import logging
+import os
 import pprint
 from everett.manager import ConfigManager
 from everett.manager import ConfigOSEnv
@@ -108,7 +109,7 @@ def handle(event=None, context={}):
 
     for group in people.grouplist():
         if group.get('group') in WHITELIST:
-            community_drive_driver = TeamDrive(group.get('group'))
+            community_drive_driver = TeamDrive("{}_{}".format(os.getenv('environment'), group.get('group')))
             logger.info('Group :{} in gsuite pilot initiating sync.'.format(group.get('group')))
             community_drive_driver.find_or_create()
             work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))

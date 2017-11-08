@@ -16,3 +16,19 @@ in GSuite.
 7. Return a proposal per drive of add / remove / noops.
 8. Execute the proposal for each set of ops.
 9. Finish
+
+## Deployment
+credstash -r us-west-2 put -a gsuite-driver.token @/GSuite-Community-Driver-4ba74895df1f.json app=gsuite-driver
+
+docker run --rm -ti \
+-v ~/.aws:/root/.aws \
+-v `pwd`:/workspace \
+mozillaiam/docker-sls:latest \
+/bin/bash
+
+export STAGE=dev
+export CIS_DYNAMODB_PERSON_TABLE=CISStaging-VaultandStreams-IdentityVaultUsers-O35P6M8U9LNW
+
+sls plugin install -n serverless-python-requirements
+
+sls deploy

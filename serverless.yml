@@ -1,0 +1,49 @@
+service: gsuite-driver
+plugins:
+  - serverless-python-requirements
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    dockerImage: mozillaiam/docker-sls:latest
+    cleanupZipHelper: true
+provider:
+  name: aws
+  runtime: python3.6
+  stage: ${env:STAGE}
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:DescribeTable"
+        - "dynamodb:GetItem"
+        - "dynamodb:GetRecords"
+        - "dynamodb:GetShardIterator"
+        - "dynamodb:ListStreams"
+        - "dynamodb:ListTables"
+        - "dynamodb:ListTagsOfResource"
+        - "dynamodb:Query"
+        - "dynamodb:Scan"
+      Resource: arn:aws:dynamodb:*:*:table/CIS*-*-*
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:DescribeTable"
+        - "dynamodb:GetItem"
+        - "dynamodb:GetRecords"
+        - "dynamodb:GetShardIterator"
+        - "dynamodb:ListStreams"
+        - "dynamodb:ListTables"
+        - "dynamodb:ListTagsOfResource"
+        - "dynamodb:Query"
+        - "dynamodb:Scan"
+      Resource: arn:aws:dynamodb:*:*:table/credential-store
+functions:
+  gsuite-driver:
+    handler: main.handle
+    timeout: 300
+    environment:
+      environment: ${self:provider.stage}
+      CIS_DYNAMODB_PERSON_TABLE: ${env:CIS_DYNAMODB_PERSON_TABLE}
+    events:
+      - schedule:
+          name: 10-minute-sync
+          description: 'Every 10 minutes'
+          rate: rate(10 minutes)
