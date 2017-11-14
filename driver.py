@@ -141,7 +141,7 @@ class TeamDrive(object):
         #return credentials
         if os.getenv('environment') == 'prod':
             logger.info('prod configuration active.')
-            email = 'iam-robot@test.mozilla.com'
+            email = 'iam-robot@mozilla.com'
         elif os.getenv('environment') == 'dev':
             logger.info('dev configuration active.')
             email = 'iam-robot@test.mozilla.com'
@@ -209,12 +209,21 @@ class TeamDrive(object):
         if reconciled_dictionary['additions'] is not []:
             for member in reconciled_dictionary['additions']:
                 logger.info('Adding member {} to {}.'.format(member, self.drive_name))
-                self.member_add(member)
+                try:
+                    self.member_add(member)
+                except Exception as e:
+                    logger.error(e)
+                    logger.info('Could not add member {} to {}.'.format(member, self.drive_name))
+
 
         if reconciled_dictionary['removals'] is not []:
             for member in reconciled_dictionary['removals']:
                 logger.info('Removing member {} from {}.'.format(member, self.drive_name))
-                self.member_remove(member)
+                try:
+                    self.member_remove(member)
+                except Exception as e:
+                    logger.error(e)
+                    logger.info('Could not remove member {} from {}.'.format(member, self.drive_name))
 
     def _email_to_permission_id(self, email):
         for member in self.members:
@@ -258,7 +267,7 @@ class TeamDrive(object):
         #return credentials
         if os.getenv('environment') == 'prod':
             logger.info('prod configuration active.')
-            delegated_credentials = credentials.create_delegated('iam-robot@test.mozilla.com')
+            delegated_credentials = credentials.create_delegated('iam-robot@mozilla.com')
         elif os.getenv('environment') == 'dev':
             logger.info('dev configuration active.')
             delegated_credentials = credentials.create_delegated('iam-robot@test.mozilla.com')
