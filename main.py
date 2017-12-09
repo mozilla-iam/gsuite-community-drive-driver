@@ -21,7 +21,16 @@ CIS_DYNAMODB_PERSON_TABLE
 """
 
 # Users must be a member of these groups to participate in the gsuite pilot.
-WHITELIST = ['mozilliansorg_cis_whitelist']
+WHITELIST = [
+    'mozilliansorg_cis_whitelist',
+    'mozilliansorg_group3_test',
+    'mozilliansorg_group4_test',
+    'mozilliansorg_reps council',
+    'mozilliansorg_open-innovation-reps-council',
+    'mozilliansorg_qa_whitelist',
+    'mozilliansorg_iam-project',
+    'mozilliansorg_mozillasecurity'
+]
 
 
 def get_config():
