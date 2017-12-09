@@ -116,7 +116,7 @@ class TeamDrive(object):
         if self.gsuite_api is None:
             self.authenticate()
         # For now assume we only give write.
-        role = 'writer'
+        role = 'organizer'
 
         body = {
             'type': 'user', 'role': role,
