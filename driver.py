@@ -11,7 +11,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 SA_CREDENTIALS_FILENAME = 'GDrive.json'
 APPLICATION_NAME = 'Gdrive-Community-Test'
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gsuite-driver')
 
 
 def get_secret(secret_name, context):
@@ -124,13 +124,17 @@ class TeamDrive(object):
         }
 
         drive = self.find()
-
-        return self.gsuite_api.permissions().create(
-            body=body, fileId=drive.get('id'),
-            supportsTeamDrives=True,
-            useDomainAdminAccess=True,
-            fields='id'
-        ).execute().get('id')
+        try:
+            res = self.gsuite_api.permissions().create(
+                body=body, fileId=drive.get('id'),
+                supportsTeamDrives=True,
+                useDomainAdminAccess=True,
+                fields='id'
+            ).execute().get('id')
+        except Exception as e:
+            logger.info('Could not add user {} due to : {}'.format(member_email, e))
+            res = e
+        return res
 
     def ensure_iam_robot_owner(self):
         """Add a member to a team drive."""
@@ -213,7 +217,7 @@ class TeamDrive(object):
                     self.member_add(member)
                 except Exception as e:
                     logger.error(e)
-                    logger.info('Could not add member {} to {}.'.format(member, self.drive_name))
+                    logger.error('Could not add member {} to {}.'.format(member, self.drive_name))
 
 
         if reconciled_dictionary['removals'] is not []:

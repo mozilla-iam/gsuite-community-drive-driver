@@ -7,7 +7,7 @@ from everett.manager import ConfigOSEnv
 
 from driver import TeamDrive
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gsuite-driver')
 
 logging.basicConfig(
    level=logging.INFO,
@@ -56,7 +56,29 @@ class CISTable(object):
     def all(self):
         if self.table is None:
             self.connect()
-        return self.table.scan().get('Items')
+
+        response = self.table.scan(
+                AttributesToGet=[
+                    'active',
+                    'emails',
+                    'groups'
+                ]
+            )
+
+        users = response.get('Items')
+
+        while 'LastEvaluatedKey' in response:
+            response = self.table.scan(
+                AttributesToGet=[
+                    'active',
+                    'emails',
+                    'groups'
+                ],
+                ExclusiveStartKey=response['LastEvaluatedKey']
+            )
+            users.extend(response['Items'])
+
+        return users
 
 
 class People(object):
@@ -93,21 +115,25 @@ class People(object):
                 if proposed_group not in groups:
                     groups.append(proposed_group)
                     logger.info('Group {g} added to group masterlist.'.format(g=group))
-
                 else:
                     logger.info('Group {g} already in grouplist passing on adding DUP!'.format(g=group))
-
         return groups
 
     def build_email_list(self, group_dict):
         memberships = []
         for member in group_dict['members']:
             for email in member['emails']:
+                logger.info('Adding member to list {}'.format(email['value']))
                 if email['value'].split('@')[1] == 'mozilla.com':
                     memberships.append(email['value'])
+                    logger.info('Adding member to list {}'.format(email['value']))
+                    continue
                 elif email['name'] == 'Google Provider':
                     memberships.append(email['value'])
+                    logger.info('Adding member to list {}'.format(email['value']))
+                    continue
                 else:
+                    logger.info('Could not reason about user: {}'.format(email['value']))
                     pass
         return memberships
 
@@ -119,7 +145,6 @@ def handle(event=None, context={}):
     for group in people.grouplist():
         if group.get('group') in WHITELIST:
             community_drive_driver = TeamDrive("{}_{}".format(os.getenv('environment'), group.get('group')))
-            logger.info('Group :{} in gsuite pilot initiating sync.'.format(group.get('group')))
             community_drive_driver.find_or_create()
             work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))
             community_drive_driver.execute_proposal(work_plan)
