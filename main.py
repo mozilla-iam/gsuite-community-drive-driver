@@ -30,6 +30,7 @@ WHITELIST = [
     'mozilliansorg_qa_whitelist',
     'mozilliansorg_iam-project',
     'mozilliansorg_mozillasecurity'
+    'mozilliansorg_mcws-team'
 ]
 
 
@@ -59,6 +60,7 @@ class CISTable(object):
 
         response = self.table.scan(
                 AttributesToGet=[
+                    'user_id',
                     'active',
                     'emails',
                     'groups'
@@ -78,6 +80,13 @@ class CISTable(object):
             )
             users.extend(response['Items'])
 
+        count = 0
+        for user in users:
+            print(user)
+            if 'mozilliansorg_nda' in user.get('groups'):
+                count = count + 1
+
+        print(count)
         return users
 
 
