@@ -72,24 +72,25 @@ class TeamDrive(object):
             drives = []
 
             # Pull back the first page of drives
-            result = self.gsuite_api.teamdrives().list(pageSize=10,useDomainAdminAccess=True).execute()
+            result = self.gsuite_api.teamdrives().list(pageSize=100,useDomainAdminAccess=True).execute()
 
-            while result.get('nextPageToken') is not None:
+            while result.get('nextPageToken', None) is not None:
                 for drive in result.get('teamDrives'):
                     drives.append(drive)
-
-                for drive in drives:
-                    if self.drive_name == drive.get('name'):
-                        logger.info('A drive with a matching name has been located for: {}'.format(self.drive_name))
-                        self.drive = drive
-                        return drive
-                        break
 
                 logger.info('Drive not found in page.  Pulling next page: {}'.format(result.get('nextPageToken')))
 
                 result = self.gsuite_api.teamdrives().list(
-                    pageSize=10,pageToken=result.get('nextPageToken'),useDomainAdminAccess=True
+                    pageSize=100,pageToken=result.get('nextPageToken'),useDomainAdminAccess=True
                 ).execute()
+
+            logger.info('All pages searched.  Proceeding to drive ident.')
+
+            for drive in drives:
+                if self.drive_name == drive.get('name'):
+                    logger.info('A drive with a matching name has been located for: {}'.format(self.drive_name))
+                    self.drive = drive
+                    return drive
 
             logger.info('Unable to locate drive: {}'.format(self.drive_name))
         return None

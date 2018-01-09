@@ -20,19 +20,6 @@ Group driver configuration
 CIS_DYNAMODB_PERSON_TABLE
 """
 
-# Users must be a member of these groups to participate in the gsuite pilot.
-WHITELIST = [
-    'mozilliansorg_cis_whitelist',
-    'mozilliansorg_group3_test',
-    'mozilliansorg_group4_test',
-    'mozilliansorg_reps council',
-    'mozilliansorg_open-innovation-reps-council',
-    'mozilliansorg_qa_whitelist',
-    'mozilliansorg_iam-project',
-    'mozilliansorg_mozillasecurity'
-    'mozilliansorg_mcws-team'
-]
-
 
 def get_config():
     return ConfigManager(
@@ -152,10 +139,11 @@ def handle(event=None, context={}):
     people = People()
 
     for group in people.grouplist():
-        if group.get('group') in WHITELIST:
+        if group.get('group').split('_')[0] == 'mozilliansorg':
+            logger.info('Creating mozilliansorg_ drive for: {}'.format(group.get('group')))
             community_drive_driver = TeamDrive("{}_{}".format(os.getenv('environment'), group.get('group')))
             community_drive_driver.find_or_create()
             work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))
             community_drive_driver.execute_proposal(work_plan)
         else:
-            logger.info('Group :{} not whitelisted for team drive testing.'.format(group.get('group')))
+            logger.info('Group :{} not a mozilliansorg_ group.'.format(group.get('group')))
