@@ -7,7 +7,7 @@ from everett.manager import ConfigOSEnv
 
 from driver import TeamDrive
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gsuite-driver')
 
 logging.basicConfig(
    level=logging.INFO,
@@ -19,18 +19,6 @@ Group driver configuration
 * Environment variables used
 CIS_DYNAMODB_PERSON_TABLE
 """
-
-# Users must be a member of these groups to participate in the gsuite pilot.
-WHITELIST = [
-    'mozilliansorg_cis_whitelist',
-    'mozilliansorg_group3_test',
-    'mozilliansorg_group4_test',
-    'mozilliansorg_reps council',
-    'mozilliansorg_open-innovation-reps-council',
-    'mozilliansorg_qa_whitelist',
-    'mozilliansorg_iam-project',
-    'mozilliansorg_mozillasecurity'
-]
 
 
 def get_config():
@@ -56,7 +44,37 @@ class CISTable(object):
     def all(self):
         if self.table is None:
             self.connect()
-        return self.table.scan().get('Items')
+
+        response = self.table.scan(
+                AttributesToGet=[
+                    'user_id',
+                    'active',
+                    'emails',
+                    'groups'
+                ]
+            )
+
+        users = response.get('Items')
+
+        while 'LastEvaluatedKey' in response:
+            response = self.table.scan(
+                AttributesToGet=[
+                    'active',
+                    'emails',
+                    'groups'
+                ],
+                ExclusiveStartKey=response['LastEvaluatedKey']
+            )
+            users.extend(response['Items'])
+
+        count = 0
+        for user in users:
+            print(user)
+            if 'mozilliansorg_nda' in user.get('groups'):
+                count = count + 1
+
+        print(count)
+        return users
 
 
 class People(object):
@@ -93,21 +111,25 @@ class People(object):
                 if proposed_group not in groups:
                     groups.append(proposed_group)
                     logger.info('Group {g} added to group masterlist.'.format(g=group))
-
                 else:
                     logger.info('Group {g} already in grouplist passing on adding DUP!'.format(g=group))
-
         return groups
 
     def build_email_list(self, group_dict):
         memberships = []
         for member in group_dict['members']:
             for email in member['emails']:
+                logger.info('Adding member to list {}'.format(email['value']))
                 if email['value'].split('@')[1] == 'mozilla.com':
                     memberships.append(email['value'])
+                    logger.info('Adding member to list {}'.format(email['value']))
+                    continue
                 elif email['name'] == 'Google Provider':
                     memberships.append(email['value'])
+                    logger.info('Adding member to list {}'.format(email['value']))
+                    continue
                 else:
+                    logger.info('Could not reason about user: {}'.format(email['value']))
                     pass
         return memberships
 
@@ -115,13 +137,13 @@ class People(object):
 def handle(event=None, context={}):
     logger.info('Initializing connector.')
     people = People()
-
+    found = []
     for group in people.grouplist():
-        if group.get('group') in WHITELIST:
+        if group.get('group').split('_')[0] == 'mozilliansorg' and group.get('group') != 'mozilliansorg_nda':
+            logger.info('Creating mozilliansorg_ drive for: {}'.format(group.get('group')))
             community_drive_driver = TeamDrive("{}_{}".format(os.getenv('environment'), group.get('group')))
-            logger.info('Group :{} in gsuite pilot initiating sync.'.format(group.get('group')))
             community_drive_driver.find_or_create()
             work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))
             community_drive_driver.execute_proposal(work_plan)
         else:
-            logger.info('Group :{} not whitelisted for team drive testing.'.format(group.get('group')))
+            logger.info('Group :{} not a mozilliansorg_ group.'.format(group.get('group')))

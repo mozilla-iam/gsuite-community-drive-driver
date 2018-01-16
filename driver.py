@@ -3,6 +3,7 @@ import credstash
 import httplib2
 import logging
 import os
+import time
 import uuid
 
 from apiclient import discovery
@@ -11,7 +12,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 SA_CREDENTIALS_FILENAME = 'GDrive.json'
 APPLICATION_NAME = 'Gdrive-Community-Test'
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gsuite-driver')
 
 
 def get_secret(secret_name, context):
@@ -42,7 +43,9 @@ class TeamDrive(object):
                 body=self.drive_metadata,
                 requestId=self._generate_request_id(),
                 fields='id'
-            ).execute()
+        ).execute()
+
+        self.find()
 
         logger.info("Ensuring the robot owns the drive.")
         self.ensure_iam_robot_owner()
@@ -69,13 +72,32 @@ class TeamDrive(object):
             logger.info('Drive already has been discovered returning self.drive: {}'.format(self.drive_name))
             return self.drive
         else:
+            drives = []
+
+            # Pull back the first page of drives
             result = self.gsuite_api.teamdrives().list(pageSize=100,useDomainAdminAccess=True).execute()
 
+            while result.get('nextPageToken', None) is not None:
+                for drive in result.get('teamDrives'):
+                    drives.append(drive)
+
+                logger.info('Drive not found in page.  Pulling next page: {}'.format(result.get('nextPageToken')))
+
+                result = self.gsuite_api.teamdrives().list(
+                    pageSize=100,pageToken=result.get('nextPageToken'),useDomainAdminAccess=True
+                ).execute()
+
             for drive in result.get('teamDrives'):
+                drives.append(drive)
+
+            logger.info('All pages searched.  Proceeding to drive ident.')
+
+            for drive in drives:
                 if self.drive_name == drive.get('name'):
                     logger.info('A drive with a matching name has been located for: {}'.format(self.drive_name))
                     self.drive = drive
                     return drive
+
             logger.info('Unable to locate drive: {}'.format(self.drive_name))
         return None
 
@@ -124,13 +146,17 @@ class TeamDrive(object):
         }
 
         drive = self.find()
-
-        return self.gsuite_api.permissions().create(
-            body=body, fileId=drive.get('id'),
-            supportsTeamDrives=True,
-            useDomainAdminAccess=True,
-            fields='id'
-        ).execute().get('id')
+        try:
+            res = self.gsuite_api.permissions().create(
+                body=body, fileId=drive.get('id'),
+                supportsTeamDrives=True,
+                useDomainAdminAccess=True,
+                fields='id'
+            ).execute().get('id')
+        except Exception as e:
+            logger.info('Could not add user {} due to : {}'.format(member_email, e))
+            res = e
+        return res
 
     def ensure_iam_robot_owner(self):
         """Add a member to a team drive."""
@@ -157,7 +183,7 @@ class TeamDrive(object):
             supportsTeamDrives=True,
             useDomainAdminAccess=True,
             fields='id'
-        ).execute().get('id')
+        ).execute()
 
     def member_remove(self, member_email):
         """Remove a member from a team drive."""
@@ -213,7 +239,7 @@ class TeamDrive(object):
                     self.member_add(member)
                 except Exception as e:
                     logger.error(e)
-                    logger.info('Could not add member {} to {}.'.format(member, self.drive_name))
+                    logger.error('Could not add member {} to {}.'.format(member, self.drive_name))
 
 
         if reconciled_dictionary['removals'] is not []:
