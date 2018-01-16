@@ -137,9 +137,9 @@ class People(object):
 def handle(event=None, context={}):
     logger.info('Initializing connector.')
     people = People()
-
+    found = []
     for group in people.grouplist():
-        if group.get('group').split('_')[0] == 'mozilliansorg':
+        if group.get('group').split('_')[0] == 'mozilliansorg' and group.get('group') != 'mozilliansorg_nda':
             logger.info('Creating mozilliansorg_ drive for: {}'.format(group.get('group')))
             community_drive_driver = TeamDrive("{}_{}".format(os.getenv('environment'), group.get('group')))
             community_drive_driver.find_or_create()

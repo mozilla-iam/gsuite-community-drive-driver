@@ -3,6 +3,7 @@ import credstash
 import httplib2
 import logging
 import os
+import time
 import uuid
 
 from apiclient import discovery
@@ -42,7 +43,9 @@ class TeamDrive(object):
                 body=self.drive_metadata,
                 requestId=self._generate_request_id(),
                 fields='id'
-            ).execute()
+        ).execute()
+
+        self.find()
 
         logger.info("Ensuring the robot owns the drive.")
         self.ensure_iam_robot_owner()
@@ -83,6 +86,9 @@ class TeamDrive(object):
                 result = self.gsuite_api.teamdrives().list(
                     pageSize=100,pageToken=result.get('nextPageToken'),useDomainAdminAccess=True
                 ).execute()
+
+            for drive in result.get('teamDrives'):
+                drives.append(drive)
 
             logger.info('All pages searched.  Proceeding to drive ident.')
 
@@ -177,7 +183,7 @@ class TeamDrive(object):
             supportsTeamDrives=True,
             useDomainAdminAccess=True,
             fields='id'
-        ).execute().get('id')
+        ).execute()
 
     def member_remove(self, member_email):
         """Remove a member from a team drive."""
