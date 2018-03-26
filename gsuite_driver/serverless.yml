@@ -58,6 +58,6 @@ functions:
       CIS_DYNAMODB_PERSON_TABLE: ${env:CIS_DYNAMODB_PERSON_TABLE}
     events:
       - schedule:
-          name: 10-minute-sync
-          description: 'Every 10 minutes'
+          name: gsuite-driver-10-minute-sync
+          description: 'Sync groups with google every 10 minutes'
           rate: rate(10 minutes)
