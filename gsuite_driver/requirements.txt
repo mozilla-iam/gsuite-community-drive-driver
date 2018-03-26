@@ -1,3 +1,5 @@
 credstash
 everett
 google-api-python-client
+prompt_toolkit
+watchtower

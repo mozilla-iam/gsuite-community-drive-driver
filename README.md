@@ -51,9 +51,6 @@ docker run --rm -ti \
 mozillaiam/docker-sls:latest \
 /bin/bash
 
-export STAGE=dev
-export CIS_DYNAMODB_PERSON_TABLE=CISStaging-VaultandStreams-IdentityVaultUsers-O35P6M8U9LNW
-
 sls plugin install -n serverless-python-requirements
 
 sls deploy --stage dev --region us-west-2

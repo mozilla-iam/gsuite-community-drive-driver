@@ -2,6 +2,7 @@ service: gsuite-driver
 plugins:
   - serverless-python-requirements
 custom:
+  stage: ${env:STAGE}
   pythonRequirements:
     dockerizePip: false
     dockerImage: mozillaiam/docker-sls:latest
@@ -36,7 +37,7 @@ provider:
         - "dynamodb:ListTagsOfResource"
         - "dynamodb:Query"
         - "dynamodb:Scan"
-      Resource: arn:aws:dynamodb:*:*:table/cis-stream-prod-and-idv-IdentityVaultUsers-LMGGZ2XE8K6F/*
+      Resource: arn:aws:dynamodb:*:*:table/CISStaging-VaultandStreams-IdentityVaultUsers-O35P6M8U9LNW
     - Effect: "Allow"
       Action:
         - "dynamodb:DescribeTable"
@@ -49,15 +50,47 @@ provider:
         - "dynamodb:Query"
         - "dynamodb:Scan"
       Resource: arn:aws:dynamodb:*:*:table/credential-store
+    - Effect: "Allow"
+      Action:
+        - "dynamodb:DescribeTable"
+        - "dynamodb:GetItem"
+        - "dynamodb:GetRecords"
+        - "dynamodb:GetShardIterator"
+        - "dynamodb:ListStreams"
+        - "dynamodb:ListTables"
+        - "dynamodb:ListTagsOfResource"
+        - "dynamodb:Query"
+        - "dynamodb:Scan"
+        - "dynamodb:PutItem"
+      Resource: arn:aws:dynamodb:*:*:table/gsuite-driver-state
+    -
+      Effect: "Allow"
+      Action:
+        - "logs:*"
+      Resource:
+        - "arn:aws:logs:*:*:log-group:/cis/**"
 functions:
   gsuite-driver:
     handler: main.handle
     timeout: 300
-    environment:
-      environment: ${self:provider.stage}
-      CIS_DYNAMODB_PERSON_TABLE: ${env:CIS_DYNAMODB_PERSON_TABLE}
+    environment: ${file(${self:custom.stage}-vars.yml)}
     events:
       - schedule:
-          name: 10-minute-sync
-          description: 'Every 10 minutes'
+          name: gsuite-driver-10-minute-sync
+          description: 'Sync groups with google every 10 minutes'
           rate: rate(10 minutes)
+resources:
+  Resources:
+    stateTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: gsuite-driver-state
+        AttributeDefinitions:
+          - AttributeName: name
+            AttributeType: S
+        KeySchema:
+          - AttributeName: name
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5

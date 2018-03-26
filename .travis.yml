@@ -1,0 +1,19 @@
+language: python
+dist: trusty
+notifications:
+  email: false
+python:
+  - 3.6
+before_install:
+  - pip install boto
+  - pip install boto3
+  - pip install flake8
+  - pip install faker
+  - flake8 gsuite_driver
+  - flake8 tests
+  - npm install -g dynalite
+install:
+  - pip install -r gsuite_driver/requirements.txt
+  - scripts/start-dynamo-local.sh
+script:
+  - python3 -m unittest discover tests

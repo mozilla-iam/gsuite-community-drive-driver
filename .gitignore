@@ -1,4 +1,9 @@
 # Distribution / packaging
+__pycache__
+tests/.cache
+tests/__pycache__
+guiste_drive/node_modules/
+.cache
 .Python
 env/
 build/
@@ -15,6 +20,9 @@ var/
 *.egg-info/
 .installed.cfg
 *.egg
+
+# Scripts
+scripts/logs/*.log
 
 # Serverless directories
 .serverless
