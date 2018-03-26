@@ -1,4 +1,5 @@
 """Mozilla GSuite Driver"""
+import boto3
 import credstash
 import httplib2
 import logging
@@ -8,6 +9,16 @@ import uuid
 from apiclient import discovery
 from oauth2client.service_account import ServiceAccountCredentials
 from prompt_toolkit import prompt
+
+from apiclient.errors import HttpError
+
+try:
+    from settings import get_config
+    from exceptions import DriveNameLockedError
+except ImportError:
+    from gsuite_driver.settings import get_config
+    from gsuite_driver.exceptions import DriveNameLockedError
+
 
 SA_CREDENTIALS_FILENAME = 'GDrive.json'
 APPLICATION_NAME = 'Gdrive-Community-Test'
@@ -47,13 +58,55 @@ def ask_question(interactive_mode, message, operation, drive_name, detail):
     return True
 
 
+class AuditTrail(object):
+    def __init__(self):
+        self.boto_session = boto3.session.Session()
+        self.config = get_config()
+        self.table_name = self.config('state_table', namespace='gsuite_driver', default='gsuite-driver-state')
+        self.table = None
+
+    def connect(self):
+        resource = self.boto_session.resource('dynamodb')
+        self.table = resource.Table(self.table_name)
+        return self.table
+
+    def create(self, drive):
+        if self.table is None:
+            self.connect()
+
+        result = self.table.put_item(
+            Item=drive
+        )
+
+        return result
+
+    def is_blocked(self, drive_name):
+        if self.table is None:
+            self.connect()
+
+        result = self.table.get_item(
+            Key={
+                'name': drive_name
+            }
+        )
+
+        if result.get('Item', False):
+            return True
+        else:
+            return False
+
+    def populate(self, all_drive_objects):
+        for drive in all_drive_objects:
+            self.create(drive)
+
+
 class TeamDrive(object):
-    def __init__(self, drive_name, environment, state_table=None, interactive_mode='True'):
+    def __init__(self, drive_name, environment, interactive_mode='True'):
+        self.audit = None
         self.drive = None
         self.drive_name = drive_name
         self.drive_metadata = self._format_metadata(drive_name)
         self.environment = environment
-        self.state_table = None
         self.gsuite_api = None
         self.drive_list = None
         self.interactive_mode = interactive_mode
@@ -81,7 +134,7 @@ class TeamDrive(object):
                 fields='id'
         ).execute()
 
-        self.find()
+        self.drive = self.find()
 
         logger.info("Ensuring the robot owns the drive.")
         self.ensure_iam_robot_owner()
@@ -179,7 +232,6 @@ class TeamDrive(object):
                 drives.append(drive)
 
         self.drive_list = drives
-        print(self.drive_list)
         return drives
 
     def _is_governed_by_connector(self, drive):
@@ -215,14 +267,11 @@ class TeamDrive(object):
         if self.gsuite_api is None:
             self.authenticate()
 
-        if self.drive is not None:
+        if self.drive is not None and self.drive.get('id', False):
             logger.info('Drive already has been discovered returning self.drive: {}'.format(self.drive_name))
             return self.drive
         else:
-            if self.drive_list is None:
-                drives = self.all()
-            else:
-                drives = self.drive_list
+            drives = self.all()
 
             logger.info('All pages searched.  Proceeding to drive ident.')
 
@@ -258,8 +307,16 @@ class TeamDrive(object):
             return drive_exists
         else:
             logger.info('Could not locate drive proceeding to creation: {}'.format(self.drive_name))
-            self.create()
-            return self.find()
+            if self.audit is None:
+                self.audit = AuditTrail()
+            if not audit.is_blocked(self.drive_name):
+                self.create()
+                drive = self.find()
+                audit.create(drive)
+                return drive
+            else:
+                raise(DriveNameLockedError)
+                logger.warn('Drive name is locked.  Refusing recycle for: {}.'.format(self.drive_name))
 
     @property
     def members(self):
@@ -279,15 +336,21 @@ class TeamDrive(object):
             self.authenticate()
 
         drive = self.find()
-        selector_fields = "permissions(kind,id,type,emailAddress,domain,role,allowFileDiscovery,\
-            displayName,photoLink,expirationTime,teamDrivePermissionDetails,deleted)"
+        selector_fields = "permissions(kind,id,type,emailAddress,domain,role,allowFileDiscovery,displayName,photoLink,expirationTime,teamDrivePermissionDetails,deleted)"
 
-        resp = self.gsuite_api.permissions().list(
-            fileId=drive.get('id'), supportsTeamDrives=True,
-            useDomainAdminAccess=True, fields=selector_fields
-        ).execute()
+        try:
+            resp = self.gsuite_api.permissions().list(
+                fileId=drive.get('id'), supportsTeamDrives=True,
+                useDomainAdminAccess=True, fields=selector_fields
+            ).execute()
 
-        permissions = resp.get('permissions')
+            permissions = resp.get('permissions')
+        except Exception as e:
+            logger.error('Could not set permissions on drive: {} due to: {}'.format(
+                self.drive_name,
+                e
+                )
+            )
         return permissions
 
     def member_add(self, member_email):
@@ -354,14 +417,18 @@ class TeamDrive(object):
 
         role = 'organizer'
         body = {'type': 'user', 'role': role, 'emailAddress': email}
+
         drive = self.find()
 
-        return self.gsuite_api.permissions().create(
-            body=body, fileId=drive.get('id'),
-            supportsTeamDrives=True,
-            useDomainAdminAccess=True,
-            fields='id'
-        ).execute()
+        try:
+            result = self.gsuite_api.permissions().create(
+                body=body, fileId=drive.get('id'),
+                supportsTeamDrives=True,
+                useDomainAdminAccess=True,
+                fields='id'
+            ).execute()
+        except HttpError:
+            logger.warn('Could not set iam robot as owner for drive: {}'.format(self.drive_name))
 
     def member_remove(self, member_email):
         """Remove a member from a team drive."""
@@ -491,7 +558,6 @@ class TeamDrive(object):
 
     def _name_conformance(self, drive_name):
         if drive_name.startswith('prod_mozilliansorg') or drive_name.startswith('dev_mozilliansorg'):
-            print('matched')
             if self.environment == 'development':
                 group_name = drive_name.split('dev_mozilliansorg_')[1]
                 publisher_name = 'mozilliansorg'  # XXX TBD some day support multiple publisher conformance
@@ -524,10 +590,10 @@ class TeamDrive(object):
             credential_path, scopes
         )
 
-        if os.getenv('environment') == 'prod':
+        if self.environment == 'production':
             logger.info('prod configuration active.')
             delegated_credentials = credentials.create_delegated('iam-robot@mozilla.com')
-        elif os.getenv('environment') == 'dev':
+        elif self.environment == 'development':
             logger.info('dev configuration active.')
             delegated_credentials = credentials.create_delegated('iam-robot@test.mozilla.com')
         else:

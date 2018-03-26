@@ -53,7 +53,7 @@ class VaultTest(unittest.TestCase):
         for group in grouplist:
             assert group.get('group').split('_')[0] == 'mozilliansorg'
 
-        assert len(grouplist) > 2
+        assert len(grouplist) >= 1
         logger.info('Group list built for : {} number of groups matching prefix.'.format(len(grouplist)))
 
         good_groups = 0

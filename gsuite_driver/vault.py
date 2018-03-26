@@ -136,6 +136,7 @@ class People(object):
                 if email.get('verified') is not True:
                     logger.info('Skipping processing unverified email for member: {}'.format(email['value']))
                 else:
+                    logger.info('Attempting to match alternate email for method: {}'.format(email.get('name')))
                     if email['value'].split('@')[1] == 'mozilla.com':
                         memberships.append(email['value'])
                     elif email['name'] == 'Google Provider':
