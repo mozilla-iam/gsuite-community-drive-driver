@@ -67,6 +67,11 @@ def handle(event=None, context={}):
     groups = people.grouplist(filter_prefix)
 
     community_drive_driver = TeamDrive(drive_name=None, environment=environment, interactive_mode=driver_mode)
+
+    added = 0
+    removed = 0
+    noops = 0
+
     for group in groups:
         logger.info('GSuite driver is active for drive: {}'.format(group.get('group')))
 
@@ -83,6 +88,11 @@ def handle(event=None, context={}):
             community_drive_driver.find_or_create()
             email_list = people.build_email_list(group)
             work_plan = community_drive_driver.reconcile_members(email_list)
+
+            added = added + len(work_plan.get('additions'))
+            removed = removed + len(work_plan.get('removals'))
+            noops = noops + len(work_plan.get('noops'))
+
             logger.info('Proposed plan is : {} for drive: {}'.format(work_plan, group.get('group')))
             community_drive_driver.execute_proposal(work_plan)
             community_drive_driver.drive = None
@@ -90,4 +100,17 @@ def handle(event=None, context={}):
             logger.warn('Skipping drive due to locked name: {}'.format(drive_name))
         except HttpError as e:
             logger.error('Could not interact with drive: {} due to : {}'.format(drive_name, e))
-    return json.dumps(dict(groups_managed=len(groups), profiles_managed=(len(people.table.all))))
+
+    logger.info(
+        json.dumps(
+            dict(
+                component='teamDrive-connector',
+                groups_managed=len(groups),
+                profiles_managed=(len(people.table.all)),
+                added=added,
+                removed=removed,
+                noops=noops
+            )
+        )
+    )
+    return None

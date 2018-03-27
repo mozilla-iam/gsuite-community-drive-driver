@@ -100,6 +100,40 @@ class AuditTrail(object):
         for drive in all_drive_objects:
             self.create(drive)
 
+    def find(self, drive_name):
+        if self.table is None:
+            self.connect()
+
+        result = self.table.get_item(
+            Key={
+                'name': drive_name
+            }
+        )
+
+        return result.get('Item', False)
+
+    def update(self, drive_name, members):
+        if self.table is None:
+            self.connect()
+
+        result = self.table.get_item(
+            Key={
+                'name': drive_name
+            }
+        )
+
+        item = result.get('Item', False)
+        item['members'] = members
+
+        if item is not False:
+            result = self.table.put_item(
+                Item=item
+            )
+        else:
+            result = None
+
+        return result
+
 
 class TeamDrive(object):
     def __init__(self, drive_name, environment, interactive_mode='True'):
@@ -490,6 +524,10 @@ class TeamDrive(object):
                 additions.append(member)
             else:
                 pass
+
+        audit = AuditTrail()
+        current_members = additions + noops
+        audit.update(self.drive_name, current_members)
 
         for member in current_drive_members:
             if member not in member_list:
