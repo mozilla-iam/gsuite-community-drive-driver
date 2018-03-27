@@ -1,5 +1,7 @@
+import json
 import utils
 
+from apiclient.errors import HttpError
 from driver import AuditTrail
 from driver import TeamDrive
 from exceptions import DriveNameLockedError
@@ -73,12 +75,19 @@ def handle(event=None, context={}):
         if environment == 'development':
             drive_name = 't_' + drive_name
 
-        community_drive_driver.drive_name=drive_name
+        community_drive_driver.drive_name = drive_name.rstrip()
+        logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
+        community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
 
         try:
             community_drive_driver.find_or_create()
-            work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))
+            email_list = people.build_email_list(group)
+            work_plan = community_drive_driver.reconcile_members(email_list)
+            logger.info('Proposed plan is : {} for drive: {}'.format(work_plan, group.get('group')))
             community_drive_driver.execute_proposal(work_plan)
+            community_drive_driver.drive = None
         except DriveNameLockedError:
             logger.warn('Skipping drive due to locked name: {}'.format(drive_name))
-    return 'Completed execution of teamDrive connector.'
+        except HttpError as e:
+            logger.error('Could not interact with drive: {} due to : {}'.format(drive_name, e))
+    return json.dumps(dict(groups_managed=len(groups), profiles_managed=(len(people.table.all))))

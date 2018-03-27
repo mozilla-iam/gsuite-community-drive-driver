@@ -4,6 +4,7 @@ import credstash
 import httplib2
 import logging
 import os
+import time
 import uuid
 
 from apiclient import discovery
@@ -134,13 +135,12 @@ class TeamDrive(object):
                 fields='id'
         ).execute()
 
-        self.drive = self.find()
-
+        time.sleep(2)
+        self.find()
         logger.info("Ensuring the robot owns the drive.")
         self.ensure_iam_robot_owner()
 
         logger.info('A new gdrive has been created for proposed name: {}'.format(self.drive_name))
-
         return result
 
     def destroy(self):
@@ -309,10 +309,10 @@ class TeamDrive(object):
             logger.info('Could not locate drive proceeding to creation: {}'.format(self.drive_name))
             if self.audit is None:
                 self.audit = AuditTrail()
-            if not audit.is_blocked(self.drive_name):
+            if not self.audit.is_blocked(self.drive_name):
                 self.create()
                 drive = self.find()
-                audit.create(drive)
+                self.audit.create(drive)
                 return drive
             else:
                 raise(DriveNameLockedError)
@@ -351,6 +351,7 @@ class TeamDrive(object):
                 e
                 )
             )
+            permissions = None
         return permissions
 
     def member_add(self, member_email):
@@ -448,6 +449,7 @@ class TeamDrive(object):
 
         # Do not strip owner.
         if member_email == 'iam_robot@test.mozilla.com' or member_email == 'iam_robot@mozilla.com':
+            logger.info('Refusing to strip the drive owner.')
             return None
 
         drive = self.find()
@@ -546,9 +548,12 @@ class TeamDrive(object):
 
     def _membership_to_email_list(self, members):
         emails = []
-        for member in members:
-            emails.append(member.get('emailAddress'))
+
+        if members is not None:
+            for member in members:
+                emails.append(member.get('emailAddress'))
         return emails
+
 
     def authenticate(self):
         credentials = self._get_credentials()
