@@ -83,16 +83,16 @@ class People(object):
             if group_name == group['group']:
                 return self.master_grouplist.index(group)
 
-    def _filter_group(self, group_name, filter=None):
-        if filter is not None:
+    def _filter_group(self, group_name, prefix_filter=None):
+        if prefix_filter is not None:
             group_name = group_name
             try:
                 group_prefix = group_name.split('_')[0]
 
-                if group_prefix != filter:
+                if group_prefix != prefix_filter:
                     return False
 
-                if group_prefix == filter:
+                if group_prefix == prefix_filter:
                     return True
 
             except AttributeError:
@@ -132,12 +132,19 @@ class People(object):
                 memberships.append(member.get('primaryEmail'))
                 continue
 
+            if member.get('primaryEmail').split('@')[1] == 'getpocket.com':
+                memberships.append(member.get('primaryEmail'))
+                continue
+
+            # XXX Reminder to change this when v2 profile is prod.
             for email in member['emails']:
                 if email.get('verified') is not True:
                     logger.info('Skipping processing unverified email for member: {}'.format(email['value']))
                 else:
                     logger.info('Attempting to match alternate email for method: {}'.format(email.get('name')))
                     if email['value'].split('@')[1] == 'mozilla.com':
+                        memberships.append(email['value'])
+                    elif email['value'].split('@')[1] == 'getpocket.com':
                         memberships.append(email['value'])
                     elif email['name'] == 'Google Provider':
                         memberships.append(email['value'])

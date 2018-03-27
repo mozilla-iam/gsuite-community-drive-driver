@@ -62,7 +62,7 @@ def handle(event=None, context={}):
     people = People()
 
     logger.debug('Filtering person list to groups.')
-    groups = people.grouplist(filter=filter_prefix)
+    groups = people.grouplist(filter_prefix)
 
     community_drive_driver = TeamDrive(drive_name=None, environment=environment, interactive_mode=driver_mode)
     for group in groups:
