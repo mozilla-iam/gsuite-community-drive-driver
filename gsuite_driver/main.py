@@ -1,5 +1,6 @@
 import json
 import utils
+import re
 
 from apiclient.errors import HttpError
 from driver import AuditTrail
@@ -75,7 +76,8 @@ def handle(event=None, context={}):
     for group in groups:
         logger.info('GSuite driver is active for drive: {}'.format(group.get('group')))
 
-        drive_name = '{}_{}'.format(group.get('group').split('_')[1], filter_prefix)
+        proposed_name = re.sub(r"^{}_".format(prefix), "", group.get('group'))
+        drive_name = '{}_{}'.format(proposed_name, filter_prefix)
 
         if environment == 'development':
             drive_name = 't_' + drive_name
