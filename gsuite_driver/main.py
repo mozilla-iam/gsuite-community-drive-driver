@@ -76,7 +76,7 @@ def handle(event=None, context={}):
     for group in groups:
         logger.info('GSuite driver is active for drive: {}'.format(group.get('group')))
 
-        proposed_name = re.sub(r"^{}_".format(prefix), "", group.get('group'))
+        proposed_name = re.sub(r"^{}_".format(filter_prefix), "", group.get('group'))
         drive_name = '{}_{}'.format(proposed_name, filter_prefix)
 
         if environment == 'development':
