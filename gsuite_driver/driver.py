@@ -123,9 +123,9 @@ class AuditTrail(object):
         )
 
         item = result.get('Item', False)
-        item['members'] = members
 
         if item is not False:
+            item['members'] = members
             result = self.table.put_item(
                 Item=item
             )
@@ -253,7 +253,8 @@ class TeamDrive(object):
 
         while result.get('nextPageToken', None) is not None:
             for drive in result.get('teamDrives'):
-                drives.append(drive)
+                if self._is_governed_by_connector(drive) == True:
+                    drives.append(drive)
 
             logger.info('Drive not found in page.  Pulling next page: {}'.format(result.get('nextPageToken')))
 
@@ -262,7 +263,7 @@ class TeamDrive(object):
             ).execute()
 
         for drive in result.get('teamDrives'):
-            if self._is_governed_by_connector(drive):
+            if self._is_governed_by_connector(drive) == True:
                 drives.append(drive)
 
         self.drive_list = drives
@@ -519,9 +520,9 @@ class TeamDrive(object):
 
         for member in member_list:
             if member in current_drive_members:
-                noops.append(member)
+                noops.append(member.lower())
             elif member not in current_drive_members:
-                additions.append(member)
+                additions.append(member.lower())
             else:
                 pass
 
@@ -531,7 +532,7 @@ class TeamDrive(object):
 
         for member in current_drive_members:
             if member not in member_list:
-                removals.append(member)
+                removals.append(member.lower())
 
         proposal = {'additions': additions, 'removals': removals, 'noops': noops}
         logger.info("Membership list built: {}".format(proposal))
@@ -552,6 +553,7 @@ class TeamDrive(object):
                 pass
             else:
                 for member in reconciled_dictionary['additions']:
+                    member = member.lower()
                     logger.info('Adding member {} to {}.'.format(member, self.drive_name))
                     try:
                         self.member_add(member)
@@ -572,6 +574,7 @@ class TeamDrive(object):
                 pass
             else:
                 for member in reconciled_dictionary['removals']:
+                    member = member.lower()
                     logger.info('Removing member {} from {}.'.format(member, self.drive_name))
                     try:
                         self.member_remove(member)
@@ -589,7 +592,9 @@ class TeamDrive(object):
 
         if members is not None:
             for member in members:
-                emails.append(member.get('emailAddress'))
+                email = member.get('emailAddress')
+                if email is not None:
+                    emails.append(email.lower())
         return emails
 
 
@@ -606,7 +611,7 @@ class TeamDrive(object):
                 publisher_name = 'mozilliansorg'  # XXX TBD some day support multiple publisher conformance
                 new_name = 't_{}_{}'.format(group_name, publisher_name)
             else:
-                group_name = drive_name.split('dev_mozilliansorg_')[1]
+                group_name = drive_name.split('prod_mozilliansorg_')[1]
                 publisher_name = 'mozilliansorg'  # XXX TBD some day support multiple publisher conformance
                 new_name = '{}_{}'.format(group_name, publisher_name)
             return new_name

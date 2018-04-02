@@ -53,11 +53,14 @@ def handle(event=None, context={}):
                 interactive_mode=driver_mode
             )
 
-            conformant_name = this_drive._name_conformance(
-                drive_name=drive.get('name')
-            )
+            try:
+                conformant_name = this_drive._name_conformance(
+                    drive_name=drive.get('name')
+                )
 
-            this_drive.update(drive.get('id'), conformant_name)
+                this_drive.update(drive.get('id'), conformant_name)
+            except Exception as e:
+                logger.error('Could not update drive due to: {}'.format(e))
 
         return 'Completed conformance mode pass on the teamDrives.'
 

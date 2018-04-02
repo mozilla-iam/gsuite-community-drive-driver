@@ -128,15 +128,15 @@ class People(object):
         memberships = []
         for member in group_dict['members']:
             if member.get('primaryEmail').split('@')[1] == 'mozilla.com':
-                memberships.append(member.get('primaryEmail'))
+                memberships.append(member.get('primaryEmail').lower())
                 continue
 
             if member.get('primaryEmail').split('@')[1] == 'mozillafoundation.org':
-                memberships.append(member.get('primaryEmail'))
+                memberships.append(member.get('primaryEmail').lower())
                 continue
 
             if member.get('primaryEmail').split('@')[1] == 'getpocket.com':
-                memberships.append(member.get('primaryEmail'))
+                memberships.append(member.get('primaryEmail').lower())
                 continue
 
             # XXX Reminder to change this when v2 profile is prod.
@@ -146,12 +146,12 @@ class People(object):
                 else:
                     logger.info('Attempting to match alternate email for method: {}'.format(email.get('name')))
                     if email['value'].split('@')[1] == 'mozilla.com':
-                        memberships.append(email['value'])
+                        memberships.append(email['value'].lower())
                     elif email['value'].split('@')[1] == 'getpocket.com':
-                        memberships.append(email['value'])
+                        memberships.append(email['value'].lower())
                     elif email['name'] == 'Google Provider':
-                        memberships.append(email['value'])
+                        memberships.append(email['value'].lower())
                     else:
-                        logger.info('Could not reason about user: {}'.format(email['value']))
+                        logger.info('Could not reason about user: {}'.format(email['value'].lower()))
         logger.debug('Returning complete list of memberships for group: {}.'.format(group_dict.get('group')))
         return memberships
