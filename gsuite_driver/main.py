@@ -84,12 +84,11 @@ def handle(event=None, context={}):
 
         if environment == 'development':
             drive_name = 't_' + drive_name
-
-        community_drive_driver.drive_name = drive_name.rstrip()
-        logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
-        community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
-
         try:
+            community_drive_driver.drive_name = drive_name.rstrip()
+            logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
+            community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
+            
             community_drive_driver.find_or_create()
             email_list = people.build_email_list(group)
             work_plan = community_drive_driver.reconcile_members(email_list)
@@ -105,6 +104,8 @@ def handle(event=None, context={}):
             logger.warn('Skipping drive due to locked name: {}'.format(drive_name))
         except HttpError as e:
             logger.error('Could not interact with drive: {} due to : {}'.format(drive_name, e))
+        except Exception as e:
+            logger.error('Complete failure to reason about drive: {} due to : {}'.format(drive_name, e))
 
     logger.info(
         json.dumps(

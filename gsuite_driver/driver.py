@@ -302,21 +302,18 @@ class TeamDrive(object):
         if self.gsuite_api is None:
             self.authenticate()
 
-        if self.drive is not None and self.drive.get('id', False):
-            logger.info('Drive already has been discovered returning self.drive: {}'.format(self.drive_name))
-            return self.drive
-        else:
-            drives = self.all()
 
-            logger.info('All pages searched.  Proceeding to drive ident.')
+        drives = self.all()
 
-            for drive in drives:
-                if self.drive_name == drive.get('name'):
-                    logger.info('A drive with a matching name has been located for: {}'.format(self.drive_name))
-                    self.drive = drive
-                    return drive
+        logger.info('All pages searched.  Proceeding to drive ident.')
 
-            logger.info('Unable to locate drive: {}'.format(self.drive_name))
+        for drive in drives:
+            if self.drive_name == drive.get('name'):
+                logger.info('A drive with a matching name has been located for: {}'.format(self.drive_name))
+                self.drive = drive
+                return drive
+
+        logger.info('Unable to locate drive: {}'.format(self.drive_name))
         return None
 
     def find_or_create(self):
@@ -379,14 +376,14 @@ class TeamDrive(object):
                 useDomainAdminAccess=True, fields=selector_fields
             ).execute()
 
-            permissions = resp.get('permissions')
+            permissions = resp.get('permissions', [])
         except Exception as e:
-            logger.error('Could not set permissions on drive: {} due to: {}'.format(
+            logger.error('Could not get permissions from drive: {} due to: {}'.format(
                 self.drive_name,
                 e
                 )
             )
-            permissions = None
+            permissions = []
         return permissions
 
     def member_add(self, member_email):
@@ -404,6 +401,7 @@ class TeamDrive(object):
 
         if self.gsuite_api is None:
             self.authenticate()
+
         # For now assume we only give write.
         role = 'organizer'
 
@@ -419,7 +417,8 @@ class TeamDrive(object):
                 supportsTeamDrives=True,
                 useDomainAdminAccess=True,
                 fields='id'
-            ).execute().get('id')
+            ).execute()
+
         except Exception as e:
             logger.info('Could not add user {} due to : {}'.format(member_email, e))
             res = e
