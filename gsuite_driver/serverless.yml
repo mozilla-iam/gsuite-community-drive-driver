@@ -79,6 +79,7 @@ functions:
           name: gsuite-driver-10-minute-sync
           description: 'Sync groups with google every 10 minutes'
           rate: rate(10 minutes)
+          enabled: true
 resources:
   Resources:
     stateTable:

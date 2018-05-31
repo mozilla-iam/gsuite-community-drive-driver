@@ -1,5 +1,8 @@
+import json
 import utils
+import re
 
+from apiclient.errors import HttpError
 from driver import AuditTrail
 from driver import TeamDrive
 from exceptions import DriveNameLockedError
@@ -50,11 +53,14 @@ def handle(event=None, context={}):
                 interactive_mode=driver_mode
             )
 
-            conformant_name = this_drive._name_conformance(
-                drive_name=drive.get('name')
-            )
+            try:
+                conformant_name = this_drive._name_conformance(
+                    drive_name=drive.get('name')
+                )
 
-            this_drive.update(drive.get('id'), conformant_name)
+                this_drive.update(drive.get('id'), conformant_name)
+            except Exception as e:
+                logger.error('Could not update drive due to: {}'.format(e))
 
         return 'Completed conformance mode pass on the teamDrives.'
 
@@ -62,23 +68,55 @@ def handle(event=None, context={}):
     people = People()
 
     logger.debug('Filtering person list to groups.')
-    groups = people.grouplist(filter=filter_prefix)
+    groups = people.grouplist(filter_prefix)
 
     community_drive_driver = TeamDrive(drive_name=None, environment=environment, interactive_mode=driver_mode)
+
+    added = 0
+    removed = 0
+    noops = 0
+
     for group in groups:
         logger.info('GSuite driver is active for drive: {}'.format(group.get('group')))
 
-        drive_name = '{}_{}'.format(group.get('group').split('_')[1], filter_prefix)
+        proposed_name = re.sub(r"^{}_".format(filter_prefix), "", group.get('group'))
+        drive_name = '{}_{}'.format(proposed_name, filter_prefix)
 
         if environment == 'development':
             drive_name = 't_' + drive_name
-
-        community_drive_driver.drive_name=drive_name
-
         try:
+            community_drive_driver.drive_name = drive_name.rstrip()
+            logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
+            community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
+            
             community_drive_driver.find_or_create()
-            work_plan = community_drive_driver.reconcile_members(people.build_email_list(group))
+            email_list = people.build_email_list(group)
+            work_plan = community_drive_driver.reconcile_members(email_list)
+
+            added = added + len(work_plan.get('additions'))
+            removed = removed + len(work_plan.get('removals'))
+            noops = noops + len(work_plan.get('noops'))
+
+            logger.info('Proposed plan is : {} for drive: {}'.format(work_plan, group.get('group')))
             community_drive_driver.execute_proposal(work_plan)
+            community_drive_driver.drive = None
         except DriveNameLockedError:
             logger.warn('Skipping drive due to locked name: {}'.format(drive_name))
-    return 'Completed execution of teamDrive connector.'
+        except HttpError as e:
+            logger.error('Could not interact with drive: {} due to : {}'.format(drive_name, e))
+        except Exception as e:
+            logger.error('Complete failure to reason about drive: {} due to : {}'.format(drive_name, e))
+
+    logger.info(
+        json.dumps(
+            dict(
+                component='teamDrive-connector',
+                groups_managed=len(groups),
+                profiles_managed=(len(people.table.all)),
+                added=added,
+                removed=removed,
+                noops=noops
+            )
+        )
+    )
+    return None
