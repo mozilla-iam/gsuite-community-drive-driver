@@ -31,6 +31,30 @@ def handle(event=None, context={}):
     driver_mode = config('interactive', namespace='gsuite_driver', default='True')
     environment = config('environment', namespace='gsuite_driver', default='development')
     conformance = config('conformance', namespace='gsuite_driver', default='True')
+    archive = config('archive', namespace='gsuite_driver', default='True')
+
+    if archive == 'True':
+        """Perform an archiving pass on the drives."""
+        audit = AuditTrail()
+
+        community_drive_driver = TeamDrive(
+            drive_name=None,
+            environment=environment,
+            interactive_mode=driver_mode
+        )
+
+        logger.debug('Searching DynamoDb for people.')
+        people = People()
+
+        logger.debug('Filtering person list to groups.')
+        person_groups = people.grouplist(filter_prefix)
+        groups = []
+
+        for group in person_groups:
+            groups.append(group.get('group'))
+
+        logger.debug('Attemping an archiving pass on existing drives prior to start.')
+        community_drive_driver.archive(groups)
 
     if conformance == 'True':
         """Perform a conformance pass on the drives.  Ensure naming standards etc."""
@@ -88,7 +112,7 @@ def handle(event=None, context={}):
             community_drive_driver.drive_name = drive_name.rstrip()
             logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
             community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
-            
+
             community_drive_driver.find_or_create()
             email_list = people.build_email_list(group)
             work_plan = community_drive_driver.reconcile_members(email_list)

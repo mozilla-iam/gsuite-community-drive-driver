@@ -55,3 +55,7 @@ sls plugin install -n serverless-python-requirements
 
 sls deploy --stage dev --region us-west-2
 ```
+
+## Data Lifecycle
+
+Drives are archived when there are no members automatically.  Deleted after 180 days.

@@ -5,6 +5,8 @@ from everett.manager import ConfigOSEnv
 :mod:`gsuite-driver.settings` -- GSuite Driver Configuration
 * Environment variables used
 * GSUITE_DRIVER_PREFIX
+* GSUITE_DRIVER_ARCHIVING
+* GSUITE_DRIVER_DELETE
 """
 
 

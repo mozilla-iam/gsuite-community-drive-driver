@@ -135,6 +135,30 @@ class AuditTrail(object):
         return result
 
 
+class Archive(object):
+    def __init__(self, master_grouplist, master_drive_list, interactive_mode):
+        self.master_grouplist = master_grouplist
+        self.master_drive_list = master_drive_list
+        self.interactive_mode = interactive_mode
+
+    def should_be_archived(self, drive):
+        logger.debug(self.master_grouplist)
+        drive_name = self.derive_group_name_from_drive(drive)
+        if drive_name not in self.master_grouplist:
+            logger.debug('Drive {} not in master grouplist.'.format(drive_name))
+            return True
+
+    def derive_group_name_from_drive(self, drive):
+        if drive.get('name').startswith('t_'):
+            group_name_for_drive = drive.get('name')[-(len(drive.get('name'))-2):]
+            group_name_for_drive = 'mozilliansorg_' + group_name_for_drive.split('_mozilliansorg')[0]
+        else:
+            group_name_for_drive = 'mozilliansorg_' + drive.get('name').split('_mozilliansorg')[0]
+
+        return group_name_for_drive
+
+
+
 class TeamDrive(object):
     def __init__(self, drive_name, environment, interactive_mode='True'):
         self.audit = None
@@ -269,16 +293,77 @@ class TeamDrive(object):
         self.drive_list = drives
         return drives
 
+    def archive(self, grouplist):
+        """Enumerate all teamDrive objects."""
+        interactive_result = ask_question(
+            interactive_mode=self.interactive_mode,
+            message='Run drive achiving routine?',
+            operation='FUNC',
+            drive_name=self.drive_name,
+            detail=None
+        )
+
+        if interactive_result is False:
+            return None
+
+        if self.gsuite_api is None:
+            self.authenticate()
+
+        all_drives = self.all()
+        archive = Archive(grouplist, all_drives, self.interactive_mode)
+        for drive in all_drives:
+            if archive.should_be_archived(drive):
+                self.drive = drive
+                self.drive_name = drive.get('name')
+                interactive_result = ask_question(
+                    interactive_mode=self.interactive_mode,
+                    message='Archive this drive?',
+                    operation='GET',
+                    drive_name=self.drive_name,
+                    detail=None
+                )
+
+                memberships = self._membership_to_email_list(self.members)
+
+                for member in memberships:
+                    interactive_result = ask_question(
+                        interactive_mode=self.interactive_mode,
+                        message='Remove user for drive?',
+                        operation='DEL',
+                        drive_name=self.drive_name,
+                        detail=member
+                    )
+                    self.member_remove(member)
+
+                if len(self.members) == 0:
+                    new_name = 'archived_' + str(int(time.time())) + '_' + drive.get('name')
+                    interactive_result = ask_question(
+                        interactive_mode=self.interactive_mode,
+                        message='Move drive to archived state?',
+                        operation='PUT',
+                        drive_name=self.drive_name,
+                        detail=new_name
+                    )
+                all_drives.remove(drive)
+            else:
+                logger.debug('The drive: {} is still active and should not be archived.'.format(drive.get('name')))
+
     def _is_governed_by_connector(self, drive):
         drive_name = drive.get('name')
         if self.whitelist != []:
             if drive_name not in self.whitelist:
                 return False
 
+        if drive_name.startswith('archived') and drive_name.endswith('mozilliansorg'):
+            return False
+
         if drive_name.startswith('prod_mozilliansorg'):
             return True
 
         if drive_name.startswith('dev_mozilliansorg'):
+            return True
+
+        if drive_name.startswith('t_') and drive_name.endswith('mozilliansorg'):
             return True
 
         if drive_name.endswith('mozilliansorg'):
