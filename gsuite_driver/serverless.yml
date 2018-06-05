@@ -76,9 +76,9 @@ functions:
     environment: ${file(${self:custom.stage}-vars.yml)}
     events:
       - schedule:
-          name: gsuite-driver-10-minute-sync
-          description: 'Sync groups with google every 10 minutes'
-          rate: rate(10 minutes)
+          name: gsuite-driver-5-minute-sync
+          description: 'Sync groups with google every 5 minutes'
+          rate: rate(5 minutes)
           enabled: true
 resources:
   Resources:
