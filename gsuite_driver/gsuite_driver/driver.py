@@ -276,7 +276,7 @@ class TeamDrive(object):
 
         while result.get("nextPageToken", None) is not None:
             for drive in result.get("teamDrives"):
-                if self._is_governed_by_connector(drive) == True:
+                if self._is_governed_by_connector(drive) is True:
                     drives.append(drive)
 
             logger.info(
@@ -296,7 +296,7 @@ class TeamDrive(object):
             )
 
         for drive in result.get("teamDrives"):
-            if self._is_governed_by_connector(drive) == True:
+            if self._is_governed_by_connector(drive) is True:
                 drives.append(drive)
 
         self.drive_list = drives
@@ -402,7 +402,7 @@ class TeamDrive(object):
         if self.gsuite_api is None:
             self.authenticate()
 
-        if self.drive_list == [] or self.drive_list == None:
+        if self.drive_list == [] or self.drive_list is None:
             drives = self.all()
         else:
             drives = self.drive_list
@@ -593,6 +593,7 @@ class TeamDrive(object):
                 )
                 .execute()
             )
+            logger.debug("The result of the operation was: {}".format(result))
         except HttpError:
             logger.warn(
                 "Could not set iam robot as owner for drive: {}".format(self.drive_name)
