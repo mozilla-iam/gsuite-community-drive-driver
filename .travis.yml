@@ -10,7 +10,6 @@ before_install:
   - pip install flake8
   - pip install faker
   - flake8 gsuite_driver
-  - flake8 tests
   - npm install -g dynalite
 install:
   - pip install -r gsuite_driver/requirements.txt
