@@ -1,5 +1,7 @@
 credstash
 everett
 google-api-python-client
+oauth2client
 prompt_toolkit
 watchtower
+python-json-logger
