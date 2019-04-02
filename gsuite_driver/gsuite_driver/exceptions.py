@@ -1,5 +1,6 @@
 class GSuiteDriverError(Exception):
     """ Base Error Class """
+
     pass
 
 

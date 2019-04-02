@@ -96,7 +96,10 @@ class AuditTrail(object):
             self.connect()
 
         result = self.table.get_item(Key={"name": drive_name})
-        logger.info('Result of the find operation is: {}'.format(result), extra={'result': result})
+        logger.info(
+            "Result of the find operation is: {}".format(result),
+            extra={"result": result},
+        )
         return result.get("Item", False)
 
     def update(self, drive_name, members):
@@ -701,10 +704,9 @@ class TeamDrive(object):
                             "Could not add member {} to {}.".format(
                                 member, self.drive_name
                             ),
-                            extra={'reason': e, 'member': member}
+                            extra={"reason": e, "member": member},
                         )
                         reconciled_dictionary["additions"].pop()
-                        
 
         if reconciled_dictionary["removals"] is not []:
             interactive_result = ask_question(

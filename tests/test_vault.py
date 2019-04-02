@@ -49,7 +49,9 @@ class VaultTest(unittest.TestCase):
         p.table = cis_table
 
         grouplist = p.grouplist(
-            filter_prefix=config("prefix", namespace="gsuite_driver", default="mozilliansorg")
+            filter_prefix=config(
+                "prefix", namespace="gsuite_driver", default="mozilliansorg"
+            )
         )
 
         for group in grouplist:

@@ -153,7 +153,7 @@ def handle(event=None, context={}):
             )
 
     logger.info(
-        'The team drive connector has run.',
+        "The team drive connector has run.",
         extra=dict(
             component="teamDrive-connector",
             groups_managed=len(groups),
@@ -161,7 +161,6 @@ def handle(event=None, context={}):
             added=added,
             removed=removed,
             noops=noops,
-        )
-
+        ),
     )
     return 200
