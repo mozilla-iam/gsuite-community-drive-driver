@@ -1,8 +1,20 @@
 # G-Suite Community Drive Driver
 
 ## About
-This driver was created for the Mozilla IAM Project to satisfy an OKR around community members accessing content
-in GSuite.  
+
+This service creates and synchronizes [Google Shared Drives](https://support.google.com/a/answer/7212025)
+([previously called Google Team Drives](https://workspaceupdates.googleblog.com/2019/04/shared-drives.html))
+with [people.mozilla.org access groups](https://people.mozilla.org/a/). Each 
+time an access group is created or the members of that group change, an 
+associated Google Shared Drive is created or updated so that the members of that
+access group have access to the Google Shared Drive
+
+The syntax of the name of the Google Shared Drive is such that an access group
+called `hr-admins` would result in a Google Shared Drive called 
+`hr-admins_mozilliansorg`.
+
+This service was created to enable community members to access content in GSuite
+more easily.  
 
 ## Behavior
 
@@ -22,6 +34,7 @@ in GSuite.
 ## FAQ
 
 __Q:__ Can a Mozilla Employee or Community Member delete the drive?
+
 __A:__ No all members of the drive are equal, "writer" role. Only the drive owner can delete the drive.  In this case "iam-robot@mozilla.com" owns the drive object.
 
 __Q:__ Will a leaked service account credential result in loss of data for our other team drives.
@@ -46,10 +59,10 @@ credstash -r us-west-2 put -a gsuite-driver.token @/GSuite-Community-Driver-4ba7
 
 ```
 docker run --rm -ti \
--v ~/.aws:/root/.aws \
--v `pwd`:/workspace \
-mozillaiam/docker-sls:latest \
-/bin/bash
+  -v ~/.aws:/root/.aws \
+  -v `pwd`:/workspace \
+  mozillaiam/docker-sls:latest \
+  /bin/bash
 
 sls plugin install -n serverless-python-requirements
 

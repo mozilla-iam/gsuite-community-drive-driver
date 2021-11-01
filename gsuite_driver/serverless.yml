@@ -77,7 +77,7 @@ functions:
     events:
       - schedule:
           name: gsuite-driver-5-minute-sync
-          description: 'Sync groups with google every 5 minutes'
+          description: 'Sync people.mozilla.org access groups with Google Shared Drives every 5 minutes'
           rate: rate(5 minutes)
           enabled: true
 resources:
@@ -95,3 +95,7 @@ resources:
         ProvisionedThroughput:
           ReadCapacityUnits: 5
           WriteCapacityUnits: 5
+        Tags:
+          - Key: Source
+            Value: https://github.com/mozilla-iam/gsuite-community-drive-driver
+  Description: Create and synchronize Google Shared Drives with people.mozilla.org access groups. https://github.com/mozilla-iam/gsuite-community-drive-driver
