@@ -1,6 +1,5 @@
 import boto3
 import logging
-import os
 import unittest
 
 logging.basicConfig(
@@ -43,7 +42,7 @@ class DriverTest(unittest.TestCase):
                     'WriteCapacityUnits': 100
                 }
             )
-        except Exception as e:
+        except Exception:
             response = self.dynamodb_client.delete_table(
                 TableName='gsuite-driver-state'
             )
@@ -133,6 +132,6 @@ class DriverTest(unittest.TestCase):
             aws_secret_access_key='anything',
         )
 
-        response = self.dynamodb_client.delete_table(
+        self.dynamodb_client.delete_table(
             TableName='gsuite-driver-state'
         )
