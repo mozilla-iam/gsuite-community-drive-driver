@@ -253,7 +253,7 @@ class TeamDrive(object):
 
         while result.get('nextPageToken', None) is not None:
             for drive in result.get('teamDrives'):
-                if self._is_governed_by_connector(drive) == True:
+                if self._is_governed_by_connector(drive):
                     drives.append(drive)
 
             logger.info('Drive not found in page.  Pulling next page: {}'.format(result.get('nextPageToken')))
@@ -263,7 +263,7 @@ class TeamDrive(object):
             ).execute()
 
         for drive in result.get('teamDrives'):
-            if self._is_governed_by_connector(drive) == True:
+            if self._is_governed_by_connector(drive):
                 drives.append(drive)
 
         self.drive_list = drives
@@ -301,7 +301,6 @@ class TeamDrive(object):
 
         if self.gsuite_api is None:
             self.authenticate()
-
 
         drives = self.all()
 
@@ -368,7 +367,8 @@ class TeamDrive(object):
             self.authenticate()
 
         drive = self.find()
-        selector_fields = "permissions(kind,id,type,emailAddress,domain,role,allowFileDiscovery,displayName,photoLink,expirationTime,teamDrivePermissionDetails,deleted)"
+        selector_fields = ("permissions(kind,id,type,emailAddress,domain,role,allowFileDiscovery,"
+                           "displayName,photoLink,expirationTime,teamDrivePermissionDetails,deleted)")
 
         try:
             resp = self.gsuite_api.permissions().list(
@@ -456,7 +456,7 @@ class TeamDrive(object):
         drive = self.find()
 
         try:
-            result = self.gsuite_api.permissions().create(
+            self.gsuite_api.permissions().create(
                 body=body, fileId=drive.get('id'),
                 supportsTeamDrives=True,
                 useDomainAdminAccess=True,
@@ -595,7 +595,6 @@ class TeamDrive(object):
                 if email is not None:
                     emails.append(email.lower())
         return emails
-
 
     def authenticate(self):
         credentials = self._get_credentials()

@@ -88,7 +88,7 @@ def handle(event=None, context={}):
             community_drive_driver.drive_name = drive_name.rstrip()
             logger.info('The drive name is: {}'.format(community_drive_driver.drive_name))
             community_drive_driver.drive_metadata = community_drive_driver._format_metadata(drive_name)
-            
+
             community_drive_driver.find_or_create()
             email_list = people.build_email_list(group)
             work_plan = community_drive_driver.reconcile_members(email_list)
